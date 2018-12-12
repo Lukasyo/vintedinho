@@ -111,11 +111,28 @@ ggplot(sell_melt, aes(fill=Group, y=value, x=variable)) +
   ggtitle("Items posted & sold per seller")
 
 sellers_graph_data2 <- sellers[,c("Group","items_sold_per_user","items_posted_per_user")]
-colnames(sellers_graph_data)[names(sellers_graph_data)=="items_sold_per_seller"] <- "Items sold per seller"
-colnames(sellers_graph_data)[names(sellers_graph_data)=="items_posted_per_seller"] <- "Items posted per seller"
-sell_melt <- melt(sellers_graph_data, id = 1)
-ggplot(sell_melt, aes(fill=Group, y=value, x=variable)) +
+colnames(sellers_graph_data2)[names(sellers_graph_data2)=="items_sold_per_user"] <- "Items sold per user"
+colnames(sellers_graph_data2)[names(sellers_graph_data2)=="items_posted_per_user"] <- "Items posted per user"
+sell_melt2 <- melt(sellers_graph_data2, id = 1)
+ggplot(sell_melt2, aes(fill=Group, y=value, x=variable)) +
   geom_bar(position="dodge", stat="identity") +
   xlab("Variable")+
   ylab("Units") +
-  ggtitle("Items posted & sold per seller")
+  ggtitle("Items posted & sold per user")
+
+
+# Impact on value added services ------------------------------------------
+
+
+vas_use1 <- aggregate(revenue ~ Group + service_order_type, data = value_added_service_revenue, FUN = length )
+vas_use1 <- left_join(vas_use1,user_count)
+vas_use1$vas_per_1000_users <- vas_use1$revenue/vas_use1$user_id*1000
+
+ggplot(vas_use1, aes(fill=Group, y=vas_per_1000_users, x=service_order_type)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Service type")+
+  ylab("Value Added Services used per 1000 users, units") +
+  ggtitle("Use of Value Added Services")
+
+listing[listing$user_id %in% value_added_service_revenue$user_id,"vas"] <- "VAS used"
+listing[is.na(listing$vas),"vas"] <- "VAS not used"
