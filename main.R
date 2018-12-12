@@ -59,14 +59,63 @@ ggplot(data=gmv_test, aes(x=Group, y=revenue)) +
   
   average_product_price <- aggregate(gmv_eur_fixed ~ Group, listing[!is.na(listing$gmv_eur_fixed),], FUN = mean )
   average_product_price <- left_join(average_product_price,gmv_test[,c("Group","gmv_per_user")])
-  colnames(average_product_price)[names(average_product_price)=="gmv_eur_fixed"] <- "Average unit price"
+  colnames(average_product_price)[names(average_product_price)=="gmv_eur_fixed"] <- "Actual selling price"
   colnames(average_product_price)[names(average_product_price)=="gmv_per_user"] <- "MV per user"
-  avg_melt <- melt(average_product_price, id = 1)
 
+  listing_price <- aggregate(listing_price ~ Group, listing[!is.na(listing$listing_price),], FUN = mean )
+  suggested_price <- aggregate(suggested_price ~ Group, listing[!is.na(listing$suggested_price),], FUN = mean )
+  colnames(listing_price)[names(listing_price)=="listing_price"] <- "Listing price"
+  colnames(suggested_price)[names(suggested_price)=="suggested_price"] <- "Suggested price"
+  
+  average_product_price <- left_join(average_product_price,listing_price)
+  average_product_price <- left_join(average_product_price,suggested_price)
+  
+  avg_melt <- melt(average_product_price, id = 1)
+  
   
   ggplot(avg_melt, aes(fill=Group, y=value, x=variable)) +
     geom_bar(position="dodge", stat="identity") +
     xlab("Variable")+
     ylab("Amount in eur") +
-    ggtitle("Average price & MV per user")
+    ggtitle("Prices & MV")
   
+
+# Seller perspective ------------------------------------------------------
+
+sellers <- aggregate(user_id ~ Group, data = listing[!duplicated(listing$user_id),], FUN = length)
+colnames(sellers)[2] <- "sellers_count"
+sellers <- left_join(sellers, gmv_test[,c("Group","gmv_eur_fixed","gmv_per_user","user_id")])
+colnames(sellers)[names(sellers)=="user_id"] <- "user_count"
+items_posted <- aggregate(item_id ~ Group, data = listing, FUN = length)
+colnames(items_posted)[2] <- "items_posted"
+items_sold <- aggregate(item_id ~ Group, data = listing[!is.na(listing$gmv_eur_fixed),], FUN = length)
+colnames(items_sold)[2] <- "items_sold"
+sellers <- left_join(sellers,items_sold)
+sellers <- left_join(sellers,items_posted)
+sellers$items_sold_per_user <- sellers$items_sold/sellers$user_count
+sellers$items_sold_per_seller <- sellers$items_sold/sellers$sellers_count
+sellers$items_posted_per_user <- sellers$items_posted/sellers$user_count
+sellers$items_posted_per_seller <- sellers$items_posted/sellers$sellers_count
+sellers$gmv_per_seller <- sellers$gmv_eur_fixed/sellers$sellers_count
+sellers$items_sold_per_items_posted_per_seller <- sellers$items_sold_per_seller/sellers$items_posted_per_seller
+sellers$users_per_seller <- sellers$user_count/sellers$sellers_count
+
+sellers_graph_data <- sellers[,c("Group","items_sold_per_seller","items_posted_per_seller")]
+colnames(sellers_graph_data)[names(sellers_graph_data)=="items_sold_per_seller"] <- "Items sold per seller"
+colnames(sellers_graph_data)[names(sellers_graph_data)=="items_posted_per_seller"] <- "Items posted per seller"
+sell_melt <- melt(sellers_graph_data, id = 1)
+ggplot(sell_melt, aes(fill=Group, y=value, x=variable)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Variable")+
+  ylab("Units") +
+  ggtitle("Items posted & sold per seller")
+
+sellers_graph_data2 <- sellers[,c("Group","items_sold_per_user","items_posted_per_user")]
+colnames(sellers_graph_data)[names(sellers_graph_data)=="items_sold_per_seller"] <- "Items sold per seller"
+colnames(sellers_graph_data)[names(sellers_graph_data)=="items_posted_per_seller"] <- "Items posted per seller"
+sell_melt <- melt(sellers_graph_data, id = 1)
+ggplot(sell_melt, aes(fill=Group, y=value, x=variable)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Variable")+
+  ylab("Units") +
+  ggtitle("Items posted & sold per seller")
