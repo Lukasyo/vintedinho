@@ -136,3 +136,67 @@ ggplot(vas_use1, aes(fill=Group, y=vas_per_1000_users, x=service_order_type)) +
 
 listing[listing$user_id %in% value_added_service_revenue$user_id,"vas"] <- "VAS used"
 listing[is.na(listing$vas),"vas"] <- "VAS not used"
+
+
+vas_use2 <- aggregate(user_id ~ Group + vas, data = listing[!is.na(listing$gmv_eur_fixed),], FUN = length )
+vas_use3 <- aggregate(user_id ~ Group + vas, data = listing[!duplicated(listing$user_id),], FUN = length )
+colnames(vas_use3)[3] <- "user_count"
+vas_use2 <- left_join(vas_use2,vas_use3)
+vas_use2$items_sold_per_user <- vas_use2$user_id/vas_use2$user_count
+
+ggplot(vas_use2, aes(fill=Group, y=items_sold_per_user, x=vas)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Did seller use VAS on any of his/her items?")+
+  ylab("Items sold per user, units") +
+  ggtitle("Items sold by VAS usage")
+
+# Seller perspective SPLITS------------------------------------------------------
+
+listing$user_n_listings <- as.character(cut(listing$lister_nth_listing,
+                                                  breaks = c(0,7,22,66,36723)))
+listing[listing$user_n_listings == "(0,7]","user_n_listings"] <- "<7"
+listing[listing$user_n_listings == "(7,22]","user_n_listings"] <- "7-22"
+listing[listing$user_n_listings == "(22,66]","user_n_listings"] <- "23-66"
+listing[listing$user_n_listings == "(66,3.67e+04]","user_n_listings"] <- ">66"
+
+listing$user_n_listings <- factor(listing$user_n_listings, levels = c("<7","7-22","23-66",">66"))
+
+
+sellers <- aggregate(user_id ~ Group + user_n_listings, data = listing[!duplicated(listing$user_id),], FUN = length)
+colnames(sellers)[3] <- "sellers_count"
+
+gmv_test <- aggregate(gmv_eur_fixed ~ Group + user_n_listings, data = listing, FUN = sum )
+ab_test_users <- left_join(ab_test_users,listing[,c("user_id","user_n_listings")])
+user_count <- aggregate(user_id ~ Group + user_n_listings, data = ab_test_users, FUN = length )
+gmv_test <- left_join(gmv_test,user_count)
+gmv_test$gmv_per_user <- gmv_test$gmv_eur_fixed/gmv_test$user_id
+gmv_test$revenue <- gmv_test$gmv_per_user*1000*0.006
+
+sellers <- left_join(sellers, gmv_test[,c("Group","user_n_listings","gmv_eur_fixed","gmv_per_user","user_id")])
+colnames(sellers)[names(sellers)=="user_id"] <- "user_count"
+items_posted <- aggregate(item_id ~ Group + user_n_listings, data = listing, FUN = length)
+colnames(items_posted)[3] <- "items_posted"
+items_sold <- aggregate(item_id ~ Group + user_n_listings, data = listing[!is.na(listing$gmv_eur_fixed),], FUN = length)
+colnames(items_sold)[3] <- "items_sold"
+sellers <- left_join(sellers,items_sold)
+sellers <- left_join(sellers,items_posted)
+sellers$items_sold_per_user <- sellers$items_sold/sellers$user_count
+sellers$items_sold_per_seller <- sellers$items_sold/sellers$sellers_count
+sellers$items_posted_per_user <- sellers$items_posted/sellers$user_count
+sellers$items_posted_per_seller <- sellers$items_posted/sellers$sellers_count
+sellers$gmv_per_seller <- sellers$gmv_eur_fixed/sellers$sellers_count
+sellers$items_sold_per_items_posted_per_seller <- sellers$items_sold_per_seller/sellers$items_posted_per_seller
+sellers$users_per_seller <- sellers$user_count/sellers$sellers_count
+
+sellers_graph_data <- sellers[,c("Group","user_n_listings","items_sold_per_seller")]
+colnames(sellers_graph_data)[names(sellers_graph_data)=="items_sold_per_seller"] <- "value"
+colnames(sellers_graph_data)[names(sellers_graph_data)=="user_n_listings"] <- "variable"
+
+sellers_graph_data$variable <- factor(sellers_graph_data$variable, levels = c("<7","7-22","23-66",">66"))
+
+ggplot(sellers_graph_data, aes(fill=Group, y=value, x=variable)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Sellers number of listings posted")+
+  ylab("Units") +
+  ggtitle("Items sold per seller by sellers experience")
+
